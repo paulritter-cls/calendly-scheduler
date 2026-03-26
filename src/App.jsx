@@ -1,0 +1,831 @@
+import { useState, useEffect, useCallback } from "react";
+
+const CALENDLY_AUTH_URL = "https://auth.calendly.com/oauth/authorize";
+const CALENDLY_API = "https://api.calendly.com";
+const CLIENT_ID = import.meta.env.VITE_CALENDLY_CLIENT_ID;
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function buildAuthUrl() {
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    response_type: "token",
+    redirect_uri: REDIRECT_URI,
+  });
+  return `${CALENDLY_AUTH_URL}?${params}`;
+}
+
+function parseHash() {
+  const hash = window.location.hash.slice(1);
+  return Object.fromEntries(new URLSearchParams(hash));
+}
+
+async function api(token, path, opts = {}) {
+  const res = await fetch(`${CALENDLY_API}${path}`, {
+    ...opts,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(opts.headers || {}),
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `API error ${res.status}`);
+  }
+  return res.json();
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
+}
+
+// ── icons (inline SVG) ────────────────────────────────────────────────────────
+const Icon = {
+  calendly: () => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M7 12h10M12 7v10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  check: () => (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  warn: () => (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+      <path d="M8 2L14.5 13H1.5L8 2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      <path d="M8 7v3M8 11.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  link: () => (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M6.5 9.5l3-3M4 10l-1 1a2.83 2.83 0 004 4l3-3a2.83 2.83 0 000-4l-.5-.5M12 6l1-1a2.83 2.83 0 00-4-4L6 4a2.83 2.83 0 000 4l.5.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  copy: () => (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M3 11V3a1 1 0 011-1h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  arrow: () => (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  back: () => (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M13 8H3M7 12l-4-4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  logout: () => (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  clock: () => (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M8 5v3.5l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  user: () => (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="6" r="3" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+};
+
+// ── styles ────────────────────────────────────────────────────────────────────
+const S = {
+  page: {
+    minHeight: "100vh",
+    padding: "2rem 1.5rem",
+    maxWidth: 680,
+    margin: "0 auto",
+    fontFamily: "var(--font-sans)",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "2rem",
+    paddingBottom: "1rem",
+    borderBottom: "0.5px solid var(--color-border-tertiary)",
+  },
+  headerLeft: { display: "flex", alignItems: "center", gap: 10 },
+  title: { fontSize: 18, fontWeight: 500, color: "var(--color-text-primary)", margin: 0 },
+  subtitle: { fontSize: 13, color: "var(--color-text-secondary)", margin: "2px 0 0" },
+  card: {
+    background: "var(--color-background-primary)",
+    border: "0.5px solid var(--color-border-tertiary)",
+    borderRadius: "var(--border-radius-lg)",
+    padding: "1.25rem 1.5rem",
+    marginBottom: "1rem",
+  },
+  cardHover: {
+    cursor: "pointer",
+    transition: "border-color 0.15s",
+  },
+  section: { marginBottom: "1.75rem" },
+  label: { fontSize: 12, fontWeight: 500, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, display: "block" },
+  input: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "8px 12px",
+    borderRadius: "var(--border-radius-md)",
+    border: "0.5px solid var(--color-border-secondary)",
+    background: "var(--color-background-secondary)",
+    color: "var(--color-text-primary)",
+    fontSize: 14,
+    outline: "none",
+  },
+  btn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "9px 16px",
+    borderRadius: "var(--border-radius-md)",
+    border: "0.5px solid var(--color-border-secondary)",
+    background: "transparent",
+    color: "var(--color-text-primary)",
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: "pointer",
+    transition: "background 0.12s",
+  },
+  btnPrimary: {
+    background: "var(--color-text-primary)",
+    color: "var(--color-background-primary)",
+    border: "none",
+  },
+  btnDanger: {
+    background: "var(--color-background-danger)",
+    color: "var(--color-text-danger)",
+    border: "0.5px solid var(--color-border-danger, var(--color-border-secondary))",
+  },
+  btnSmall: { padding: "6px 11px", fontSize: 12 },
+  tag: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "3px 8px",
+    borderRadius: "var(--border-radius-md)",
+    fontSize: 12,
+    fontWeight: 500,
+  },
+  tagInfo: { background: "var(--color-background-info)", color: "var(--color-text-info)" },
+  tagWarn: { background: "var(--color-background-warning)", color: "var(--color-text-warning)" },
+  tagSuccess: { background: "var(--color-background-success)", color: "var(--color-text-success)" },
+  divider: { border: "none", borderTop: "0.5px solid var(--color-border-tertiary)", margin: "1.25rem 0" },
+  flex: { display: "flex", alignItems: "center", gap: 8 },
+  flexBetween: { display: "flex", alignItems: "center", justifyContent: "space-between" },
+  muted: { fontSize: 13, color: "var(--color-text-secondary)" },
+  mono: { fontFamily: "var(--font-mono)", fontSize: 12, background: "var(--color-background-secondary)", padding: "2px 6px", borderRadius: 4, wordBreak: "break-all" },
+  steps: { display: "flex", gap: 0, marginBottom: "2rem" },
+  stepItem: { flex: 1, position: "relative" },
+  stepDot: {
+    width: 26, height: 26, borderRadius: "50%",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 12, fontWeight: 500, margin: "0 auto 4px",
+    border: "0.5px solid var(--color-border-secondary)",
+    background: "var(--color-background-secondary)",
+    color: "var(--color-text-secondary)",
+  },
+  stepLabel: { fontSize: 11, textAlign: "center", color: "var(--color-text-secondary)" },
+  stepLine: {
+    position: "absolute", top: 13, left: "50%", right: "-50%",
+    height: "0.5px", background: "var(--color-border-tertiary)",
+    zIndex: 0,
+  },
+  alert: {
+    display: "flex", alignItems: "flex-start", gap: 10,
+    padding: "12px 14px", borderRadius: "var(--border-radius-md)",
+    border: "0.5px solid var(--color-border-warning)",
+    background: "var(--color-background-warning)",
+    color: "var(--color-text-warning)",
+    fontSize: 13, marginBottom: "1rem",
+  },
+  success: {
+    display: "flex", flexDirection: "column", alignItems: "center",
+    textAlign: "center", padding: "2rem",
+  },
+};
+
+// ── StepBar ──────────────────────────────────────────────────────────────────
+function StepBar({ current, steps }) {
+  return (
+    <div style={S.steps}>
+      {steps.map((label, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <div key={i} style={S.stepItem}>
+            {i < steps.length - 1 && <div style={S.stepLine} />}
+            <div style={{
+              ...S.stepDot,
+              background: done ? "var(--color-text-primary)" : active ? "var(--color-background-primary)" : undefined,
+              color: done ? "var(--color-background-primary)" : active ? "var(--color-text-primary)" : undefined,
+              borderColor: active ? "var(--color-text-primary)" : undefined,
+              zIndex: 1, position: "relative",
+            }}>
+              {done ? <Icon.check /> : i + 1}
+            </div>
+            <div style={{ ...S.stepLabel, color: active ? "var(--color-text-primary)" : undefined, fontWeight: active ? 500 : undefined }}>
+              {label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+function LoginScreen() {
+  return (
+    <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div style={{ textAlign: "center", maxWidth: 360 }}>
+        <div style={{ fontSize: 36, marginBottom: "0.5rem" }}>📅</div>
+        <h1 style={{ fontSize: 22, fontWeight: 500, margin: "0 0 0.5rem" }}>Team Booking</h1>
+        <p style={{ ...S.muted, marginBottom: "2rem", lineHeight: 1.6 }}>
+          Connect with Calendly to book client meetings or generate shareable scheduling links.
+        </p>
+        <a href={buildAuthUrl()} style={{ textDecoration: "none" }}>
+          <button style={{ ...S.btn, ...S.btnPrimary, padding: "10px 20px", fontSize: 14, gap: 8 }}>
+            <Icon.calendly /> Connect with Calendly
+          </button>
+        </a>
+        <p style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: "1.5rem" }}>
+          Replace <code style={S.mono}>YOUR_CALENDLY_CLIENT_ID</code> with your OAuth app client ID before deploying.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── EventCard ─────────────────────────────────────────────────────────────────
+function EventCard({ et, selected, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        ...S.card,
+        ...S.cardHover,
+        borderColor: selected ? "var(--color-text-primary)" : undefined,
+        borderWidth: selected ? 1 : undefined,
+        marginBottom: 8,
+      }}
+    >
+      <div style={S.flexBetween}>
+        <div>
+          <p style={{ margin: 0, fontWeight: 500, fontSize: 14, color: "var(--color-text-primary)" }}>{et.name}</p>
+          {et.description_plain && (
+            <p style={{ ...S.muted, margin: "3px 0 0", fontSize: 12, maxWidth: 440 }}>{et.description_plain.slice(0, 100)}{et.description_plain.length > 100 ? "…" : ""}</p>
+          )}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <span style={{ ...S.tag, ...S.tagInfo }}>
+            <Icon.clock /> {et.duration} min
+          </span>
+          {selected && <span style={{ ...S.tag, ...S.tagSuccess }}><Icon.check /> Selected</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SlotPicker ────────────────────────────────────────────────────────────────
+function SlotPicker({ slots, selected, onSelect, conflict }) {
+  const grouped = slots.reduce((acc, s) => {
+    const d = new Date(s.start_time).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    if (!acc[d]) acc[d] = [];
+    acc[d].push(s);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      {Object.entries(grouped).map(([day, daySlots]) => (
+        <div key={day} style={{ marginBottom: "1.25rem" }}>
+          <p style={{ ...S.label }}>{day}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {daySlots.map((s, i) => {
+              const time = new Date(s.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+              const isSel = selected?.start_time === s.start_time;
+              return (
+                <button key={i} onClick={() => onSelect(s)} style={{
+                  ...S.btn,
+                  ...S.btnSmall,
+                  background: isSel ? "var(--color-text-primary)" : undefined,
+                  color: isSel ? "var(--color-background-primary)" : undefined,
+                  borderColor: isSel ? "var(--color-text-primary)" : undefined,
+                }}>
+                  {time}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {conflict && selected && (
+        <div style={S.alert}>
+          <Icon.warn />
+          <div>
+            <strong>Scheduling conflict detected</strong> — {fmtDate(selected.start_time)} overlaps with an existing event.
+            You can still book this slot or choose another time.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── LinkModal ─────────────────────────────────────────────────────────────────
+function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose }) {
+  const [singleUseLink, setSingleUseLink] = useState(null);
+  const [loadingLink, setLoadingLink] = useState(false);
+  const [linkError, setLinkError] = useState(null);
+  const [copied, setCopied] = useState({});
+
+  const prefilledUrl = (() => {
+    const base = eventType.scheduling_url;
+    const p = new URLSearchParams();
+    if (inviteeData.name) p.set("name", inviteeData.name);
+    if (inviteeData.email) p.set("email", inviteeData.email);
+    // Calendly supports prefilling custom answers via a=<answer> params in some widgets
+    return `${base}${p.toString() ? "?" + p.toString() : ""}`;
+  })();
+
+  useEffect(() => {
+    async function fetchSingleUse() {
+      setLoadingLink(true);
+      setLinkError(null);
+      try {
+        const data = await api(token, "/scheduling_links", {
+          method: "POST",
+          body: {
+            max_event_count: 1,
+            owner: userUri,
+            owner_type: "users",
+          },
+        });
+        setSingleUseLink(data.resource?.booking_url || null);
+      } catch (e) {
+        setLinkError(e.message);
+      } finally {
+        setLoadingLink(false);
+      }
+    }
+    fetchSingleUse();
+  }, []);
+
+  function copy(key, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(c => ({ ...c, [key]: true }));
+      setTimeout(() => setCopied(c => ({ ...c, [key]: false })), 1800);
+    });
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 100, padding: "1rem",
+    }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ ...S.card, maxWidth: 560, width: "100%", margin: 0 }}>
+        <div style={{ ...S.flexBetween, marginBottom: "1.25rem" }}>
+          <p style={{ margin: 0, fontWeight: 500 }}>Share scheduling link</p>
+          <button onClick={onClose} style={{ ...S.btn, ...S.btnSmall, padding: "4px 8px" }}>✕</button>
+        </div>
+
+        {/* Prefilled URL */}
+        <div style={{ marginBottom: "1.25rem" }}>
+          <span style={S.label}>Pre-filled scheduling URL</span>
+          <p style={{ ...S.muted, marginBottom: 8 }}>Client opens this link with their details already filled in.</p>
+          <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+            <span style={{ ...S.mono, flex: 1, padding: "8px 10px", borderRadius: "var(--border-radius-md)", border: "0.5px solid var(--color-border-tertiary)" }}>{prefilledUrl}</span>
+            <button onClick={() => copy("prefilled", prefilledUrl)} style={{ ...S.btn, ...S.btnSmall, whiteSpace: "nowrap" }}>
+              <Icon.copy /> {copied.prefilled ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          {inviteeData.name && <p style={{ ...S.muted, fontSize: 11, marginTop: 4 }}>Prefilled: {inviteeData.name}{inviteeData.email ? `, ${inviteeData.email}` : ""}</p>}
+        </div>
+
+        <hr style={S.divider} />
+
+        {/* Single-use link */}
+        <div>
+          <span style={S.label}>Single-use link <span style={{ ...S.tag, ...S.tagInfo, marginLeft: 6 }}>1 booking max</span></span>
+          <p style={{ ...S.muted, marginBottom: 8 }}>Expires after one booking. Prevents double-booking.</p>
+          {loadingLink && <p style={S.muted}>Generating link…</p>}
+          {linkError && <p style={{ color: "var(--color-text-danger)", fontSize: 13 }}>Error: {linkError}</p>}
+          {singleUseLink && (
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+              <span style={{ ...S.mono, flex: 1, padding: "8px 10px", borderRadius: "var(--border-radius-md)", border: "0.5px solid var(--color-border-tertiary)" }}>{singleUseLink}</span>
+              <button onClick={() => copy("single", singleUseLink)} style={{ ...S.btn, ...S.btnSmall, whiteSpace: "nowrap" }}>
+                <Icon.copy /> {copied.single ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Summary of prefilled info */}
+        {(answers && Object.keys(answers).length > 0) && (
+          <>
+            <hr style={S.divider} />
+            <span style={S.label}>Pre-answered questions (for your reference)</span>
+            {Object.entries(answers).map(([q, a]) => (
+              <div key={q} style={{ marginBottom: 6 }}>
+                <span style={S.muted}>{q}:</span>{" "}
+                <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{a}</span>
+              </div>
+            ))}
+            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Note: Calendly inline scheduling links don't support prefilling custom answers — share these answers with your client separately or paste them into the meeting notes.</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+export default function App() {
+  const [token, setToken] = useState(() => sessionStorage.getItem("cal_token") || null);
+  const [user, setUser] = useState(null);
+  const [eventTypes, setEventTypes] = useState([]);
+  const [step, setStep] = useState(0); // 0=event type, 1=client info, 2=questions, 3=slot, 4=confirm/done
+  const [selectedET, setSelectedET] = useState(null);
+  const [inviteeData, setInviteeData] = useState({ name: "", email: "" });
+  const [answers, setAnswers] = useState({});
+  const [slots, setSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [conflict, setConflict] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [booked, setBooked] = useState(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+
+  // Handle OAuth redirect
+  useEffect(() => {
+    const hash = parseHash();
+    if (hash.access_token) {
+      sessionStorage.setItem("cal_token", hash.access_token);
+      setToken(hash.access_token);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
+  // Fetch user + event types after login
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const me = await api(token, "/users/me");
+        setUser(me.resource);
+        const ets = await api(token, `/event_types?user=${me.resource.uri}&active=true&count=50`);
+        setEventTypes(ets.collection || []);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token]);
+
+  // Fetch available slots when event type + date range is set
+  const fetchSlots = useCallback(async (et) => {
+    if (!et || !user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const now = new Date();
+      const end = new Date(now);
+      end.setDate(end.getDate() + 14);
+      const avail = await api(token,
+        `/event_type_available_times?event_type=${et.uri}&start_time=${now.toISOString()}&end_time=${end.toISOString()}`
+      );
+      setSlots(avail.collection || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, user]);
+
+  // Check for conflicts when slot is selected
+  useEffect(() => {
+    if (!selectedSlot || !user) return;
+    (async () => {
+      try {
+        const start = selectedSlot.start_time;
+        const end = selectedSlot.end_time || new Date(new Date(start).getTime() + (selectedET?.duration || 30) * 60000).toISOString();
+        const events = await api(token,
+          `/scheduled_events?user=${user.uri}&min_start_time=${start}&max_start_time=${end}&status=active`
+        );
+        setConflict((events.collection || []).length > 0);
+      } catch {
+        setConflict(false);
+      }
+    })();
+  }, [selectedSlot]);
+
+  function logout() {
+    sessionStorage.removeItem("cal_token");
+    setToken(null);
+    setUser(null);
+    setStep(0);
+    setSelectedET(null);
+    setBooked(null);
+  }
+
+  async function bookEvent() {
+    if (!selectedSlot || !selectedET) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // Build questions_and_answers array from answers object
+      const qa = Object.entries(answers).map(([question, answer]) => ({ question, answer }));
+      const result = await api(token, "/scheduling_links", {
+        method: "POST",
+        body: {
+          max_event_count: 1,
+          owner: user.uri,
+          owner_type: "users",
+        },
+      });
+      // Note: Calendly's v2 API doesn't allow direct booking on behalf of invitees via API —
+      // we generate a single-use link pre-configured to the slot and open it for confirmation.
+      // For orgs with admin API access, use POST /one_off_event_types instead.
+      setBooked({
+        slot: selectedSlot,
+        et: selectedET,
+        link: result.resource?.booking_url,
+      });
+      setStep(4);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const STEPS = ["Event type", "Client info", "Questions", "Time slot"];
+
+  if (!token) return <LoginScreen />;
+
+  return (
+    <div style={S.page}>
+      {/* Header */}
+      <div style={S.header}>
+        <div style={S.headerLeft}>
+          <Icon.calendly />
+          <div>
+            <p style={S.title}>Team Booking</p>
+            {user && <p style={S.subtitle}>{user.name} · {user.email}</p>}
+          </div>
+        </div>
+        <button onClick={logout} style={{ ...S.btn, ...S.btnSmall }}>
+          <Icon.logout /> Sign out
+        </button>
+      </div>
+
+      {loading && step === 0 && !eventTypes.length && (
+        <p style={S.muted}>Loading your event types…</p>
+      )}
+
+      {error && (
+        <div style={{ ...S.alert, marginBottom: "1.5rem" }}>
+          <Icon.warn /> {error}
+        </div>
+      )}
+
+      {/* Confirmation / Done */}
+      {step === 4 && booked && (
+        <div style={S.success}>
+          <div style={{ fontSize: 40, marginBottom: "0.75rem" }}>🎉</div>
+          <p style={{ fontWeight: 500, fontSize: 16, margin: "0 0 0.5rem" }}>Booking link generated</p>
+          <p style={{ ...S.muted, marginBottom: "1.5rem", maxWidth: 380, lineHeight: 1.6 }}>
+            A single-use link has been created for {fmtDate(booked.slot.start_time)}. Share it with your client or open it to confirm the booking.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {booked.link && (
+              <a href={booked.link} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                <button style={{ ...S.btn, ...S.btnPrimary }}><Icon.link /> Open booking page</button>
+              </a>
+            )}
+            <button onClick={() => { setStep(0); setSelectedET(null); setSelectedSlot(null); setAnswers({}); setInviteeData({ name: "", email: "" }); setBooked(null); }} style={S.btn}>
+              Book another
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step < 4 && (
+        <>
+          <StepBar current={step} steps={STEPS} />
+
+          {/* Step 0 — Event type */}
+          {step === 0 && (
+            <div style={S.section}>
+              <span style={S.label}>Choose event type</span>
+              {eventTypes.length === 0 && !loading && (
+                <p style={S.muted}>No active event types found.</p>
+              )}
+              {eventTypes.map(et => (
+                <EventCard
+                  key={et.uri}
+                  et={et}
+                  selected={selectedET?.uri === et.uri}
+                  onClick={() => setSelectedET(et)}
+                />
+              ))}
+              <div style={{ marginTop: "1.25rem" }}>
+                <button
+                  disabled={!selectedET}
+                  onClick={() => setStep(1)}
+                  style={{ ...S.btn, ...S.btnPrimary, opacity: selectedET ? 1 : 0.4 }}
+                >
+                  Continue <Icon.arrow />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 1 — Client info */}
+          {step === 1 && (
+            <div style={S.section}>
+              <span style={S.label}>Client details</span>
+              <p style={{ ...S.muted, marginBottom: "1rem" }}>Used to pre-fill the booking form.</p>
+              <div style={{ marginBottom: "0.75rem" }}>
+                <label style={{ ...S.label, textTransform: "none", fontSize: 13, marginBottom: 4 }}>Name</label>
+                <input
+                  style={S.input}
+                  placeholder="Full name"
+                  value={inviteeData.name}
+                  onChange={e => setInviteeData(d => ({ ...d, name: e.target.value }))}
+                />
+              </div>
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label style={{ ...S.label, textTransform: "none", fontSize: 13, marginBottom: 4 }}>Email</label>
+                <input
+                  style={S.input}
+                  type="email"
+                  placeholder="client@company.com"
+                  value={inviteeData.email}
+                  onChange={e => setInviteeData(d => ({ ...d, email: e.target.value }))}
+                />
+              </div>
+              <div style={S.flex}>
+                <button onClick={() => setStep(0)} style={S.btn}><Icon.back /> Back</button>
+                <button
+                  onClick={() => {
+                    const qs = selectedET?.custom_questions || [];
+                    if (qs.length > 0) setStep(2);
+                    else { fetchSlots(selectedET); setStep(3); }
+                  }}
+                  disabled={!inviteeData.name || !inviteeData.email}
+                  style={{ ...S.btn, ...S.btnPrimary, opacity: inviteeData.name && inviteeData.email ? 1 : 0.4 }}
+                >
+                  Continue <Icon.arrow />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 — Questions */}
+          {step === 2 && (
+            <div style={S.section}>
+              <span style={S.label}>Event questions</span>
+              <p style={{ ...S.muted, marginBottom: "1rem" }}>Answer on the client's behalf.</p>
+              {(selectedET?.custom_questions || []).map((q, i) => (
+                <div key={i} style={{ marginBottom: "0.9rem" }}>
+                  <label style={{ ...S.label, textTransform: "none", fontSize: 13, marginBottom: 4 }}>
+                    {q.name}
+                    {q.required && <span style={{ color: "var(--color-text-danger)", marginLeft: 2 }}>*</span>}
+                  </label>
+                  {q.type === "text" || q.type === "one_line_text" || q.type === "multi_line_text" ? (
+                    q.type === "multi_line_text" ? (
+                      <textarea
+                        rows={3}
+                        style={{ ...S.input, resize: "vertical" }}
+                        placeholder={q.answer_choices?.[0] || "Your answer"}
+                        value={answers[q.name] || ""}
+                        onChange={e => setAnswers(a => ({ ...a, [q.name]: e.target.value }))}
+                      />
+                    ) : (
+                      <input
+                        style={S.input}
+                        placeholder={q.answer_choices?.[0] || "Your answer"}
+                        value={answers[q.name] || ""}
+                        onChange={e => setAnswers(a => ({ ...a, [q.name]: e.target.value }))}
+                      />
+                    )
+                  ) : q.type === "single_select" || q.type === "dropdown" ? (
+                    <select
+                      style={{ ...S.input }}
+                      value={answers[q.name] || ""}
+                      onChange={e => setAnswers(a => ({ ...a, [q.name]: e.target.value }))}
+                    >
+                      <option value="">Select…</option>
+                      {(q.answer_choices || []).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      style={S.input}
+                      value={answers[q.name] || ""}
+                      onChange={e => setAnswers(a => ({ ...a, [q.name]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
+              <div style={S.flex}>
+                <button onClick={() => setStep(1)} style={S.btn}><Icon.back /> Back</button>
+                <button
+                  onClick={() => { fetchSlots(selectedET); setStep(3); }}
+                  style={{ ...S.btn, ...S.btnPrimary }}
+                >
+                  Continue <Icon.arrow />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 — Slot selection */}
+          {step === 3 && (
+            <div style={S.section}>
+              <span style={S.label}>Pick a time — next 14 days</span>
+              {loading && <p style={S.muted}>Loading available slots…</p>}
+              {!loading && slots.length === 0 && (
+                <p style={S.muted}>No available slots in the next 14 days.</p>
+              )}
+              {slots.length > 0 && (
+                <SlotPicker
+                  slots={slots}
+                  selected={selectedSlot}
+                  onSelect={setSelectedSlot}
+                  conflict={conflict}
+                />
+              )}
+              {selectedSlot && (
+                <div style={{ ...S.card, marginTop: "1rem", background: "var(--color-background-secondary)" }}>
+                  <div style={{ ...S.flexBetween }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 500, fontSize: 14 }}>{selectedET?.name}</p>
+                      <p style={{ ...S.muted, margin: "3px 0 0" }}>{fmtDate(selectedSlot.start_time)}</p>
+                      <div style={{ ...S.flex, marginTop: 6 }}>
+                        {inviteeData.name && <span style={{ ...S.tag, ...S.tagInfo }}><Icon.user /> {inviteeData.name}</span>}
+                        {conflict && <span style={{ ...S.tag, ...S.tagWarn }}><Icon.warn /> Conflict flagged</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div style={{ ...S.flex, marginTop: "1.25rem", flexWrap: "wrap" }}>
+                <button onClick={() => setStep(selectedET?.custom_questions?.length ? 2 : 1)} style={S.btn}><Icon.back /> Back</button>
+                <button
+                  disabled={!selectedSlot}
+                  onClick={bookEvent}
+                  style={{ ...S.btn, ...S.btnPrimary, opacity: selectedSlot ? 1 : 0.4 }}
+                >
+                  {loading ? "Booking…" : "Book event"} <Icon.arrow />
+                </button>
+                <button
+                  onClick={() => setShowLinkModal(true)}
+                  style={{ ...S.btn }}
+                >
+                  <Icon.link /> Generate link instead
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Link modal */}
+      {showLinkModal && (
+        <LinkModal
+          eventType={selectedET}
+          answers={answers}
+          inviteeData={inviteeData}
+          token={token}
+          userUri={user?.uri}
+          onClose={() => setShowLinkModal(false)}
+        />
+      )}
+    </div>
+  );
+}
