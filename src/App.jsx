@@ -1,23 +1,63 @@
 import { useState, useEffect, useCallback } from "react";
 
 const CALENDLY_AUTH_URL = "https://auth.calendly.com/oauth/authorize";
+const CALENDLY_TOKEN_URL = "https://auth.calendly.com/oauth/token";
 const CALENDLY_API = "https://api.calendly.com";
 const CLIENT_ID = import.meta.env.VITE_CALENDLY_CLIENT_ID;
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-function buildAuthUrl() {
+function base64url(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function generatePKCE() {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const challenge = base64url(digest);
+  return { verifier, challenge };
+}
+
+async function buildAuthUrl() {
+  const { verifier, challenge } = await generatePKCE();
+  sessionStorage.setItem("pkce_verifier", verifier);
+  const state = base64url(crypto.getRandomValues(new Uint8Array(16)));
+  sessionStorage.setItem("oauth_state", state);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
-    response_type: "token",
+    response_type: "code",
     redirect_uri: REDIRECT_URI,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    state,
   });
   return `${CALENDLY_AUTH_URL}?${params}`;
 }
 
-function parseHash() {
-  const hash = window.location.hash.slice(1);
-  return Object.fromEntries(new URLSearchParams(hash));
+async function exchangeCodeForToken(code) {
+  const verifier = sessionStorage.getItem("pkce_verifier");
+  const res = await fetch(CALENDLY_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: CLIENT_ID,
+      code,
+      redirect_uri: REDIRECT_URI,
+      code_verifier: verifier,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error_description || err.error || `Token exchange failed ${res.status}`);
+  }
+  const data = await res.json();
+  return data.access_token;
+}
+
+function parseCallback() {
+  return Object.fromEntries(new URLSearchParams(window.location.search));
 }
 
 async function api(token, path, opts = {}) {
@@ -258,11 +298,9 @@ function LoginScreen() {
         <p style={{ ...S.muted, marginBottom: "2rem", lineHeight: 1.6 }}>
           Connect with Calendly to book client meetings or generate shareable scheduling links.
         </p>
-        <a href={buildAuthUrl()} style={{ textDecoration: "none" }}>
-          <button style={{ ...S.btn, ...S.btnPrimary, padding: "10px 20px", fontSize: 14, gap: 8 }}>
-            <Icon.calendly /> Connect with Calendly
-          </button>
-        </a>
+        <button onClick={async () => { window.location.href = await buildAuthUrl(); }} style={{ ...S.btn, ...S.btnPrimary, padding: "10px 20px", fontSize: 14, gap: 8 }}>
+          <Icon.calendly /> Connect with Calendly
+        </button>
         <p style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: "1.5rem" }}>
           Replace <code style={S.mono}>YOUR_CALENDLY_CLIENT_ID</code> with your OAuth app client ID before deploying.
         </p>
@@ -475,13 +513,21 @@ export default function App() {
   const [booked, setBooked] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
 
-  // Handle OAuth redirect
+  // Handle OAuth redirect (PKCE code exchange)
   useEffect(() => {
-    const hash = parseHash();
-    if (hash.access_token) {
-      sessionStorage.setItem("cal_token", hash.access_token);
-      setToken(hash.access_token);
+    const params = parseCallback();
+    if (params.code) {
+      const savedState = sessionStorage.getItem("oauth_state");
+      if (params.state !== savedState) {
+        setError("OAuth state mismatch. Please try again.");
+        window.history.replaceState(null, "", window.location.pathname);
+        return;
+      }
       window.history.replaceState(null, "", window.location.pathname);
+      exchangeCodeForToken(params.code).then(t => {
+        sessionStorage.setItem("cal_token", t);
+        setToken(t);
+      }).catch(e => setError(e.message));
     }
   }, []);
 
