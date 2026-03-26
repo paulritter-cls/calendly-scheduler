@@ -6,7 +6,7 @@ const CALENDLY_API = "https://api.calendly.com";
 const CLIENT_ID = import.meta.env.VITE_CALENDLY_CLIENT_ID;
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ââ helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function base64url(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -21,9 +21,9 @@ async function generatePKCE() {
 
 async function buildAuthUrl() {
   const { verifier, challenge } = await generatePKCE();
-  sessionStorage.setItem("pkce_verifier", verifier);
+  localStorage.setItem("pkce_verifier", verifier);
   const state = base64url(crypto.getRandomValues(new Uint8Array(16)));
-  sessionStorage.setItem("oauth_state", state);
+  localStorage.setItem("oauth_state", state);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
@@ -36,7 +36,7 @@ async function buildAuthUrl() {
 }
 
 async function exchangeCodeForToken(code) {
-  const verifier = sessionStorage.getItem("pkce_verifier");
+  const verifier = localStorage.getItem("pkce_verifier");
   const res = await fetch(CALENDLY_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -84,7 +84,7 @@ function fmtDate(iso) {
   });
 }
 
-// ── icons (inline SVG) ────────────────────────────────────────────────────────
+// ââ icons (inline SVG) ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const Icon = {
   calendly: () => (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -143,7 +143,7 @@ const Icon = {
   ),
 };
 
-// ── styles ────────────────────────────────────────────────────────────────────
+// ââ styles ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const S = {
   page: {
     minHeight: "100vh",
@@ -259,7 +259,7 @@ const S = {
   },
 };
 
-// ── StepBar ──────────────────────────────────────────────────────────────────
+// ââ StepBar ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function StepBar({ current, steps }) {
   return (
     <div style={S.steps}>
@@ -288,12 +288,12 @@ function StepBar({ current, steps }) {
   );
 }
 
-// ── Login ─────────────────────────────────────────────────────────────────────
+// ââ Login âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function LoginScreen() {
   return (
     <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
       <div style={{ textAlign: "center", maxWidth: 360 }}>
-        <div style={{ fontSize: 36, marginBottom: "0.5rem" }}>📅</div>
+        <div style={{ fontSize: 36, marginBottom: "0.5rem" }}>ð</div>
         <h1 style={{ fontSize: 22, fontWeight: 500, margin: "0 0 0.5rem" }}>Team Booking</h1>
         <p style={{ ...S.muted, marginBottom: "2rem", lineHeight: 1.6 }}>
           Connect with Calendly to book client meetings or generate shareable scheduling links.
@@ -309,7 +309,7 @@ function LoginScreen() {
   );
 }
 
-// ── EventCard ─────────────────────────────────────────────────────────────────
+// ââ EventCard âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function EventCard({ et, selected, onClick }) {
   return (
     <div
@@ -326,7 +326,7 @@ function EventCard({ et, selected, onClick }) {
         <div>
           <p style={{ margin: 0, fontWeight: 500, fontSize: 14, color: "var(--color-text-primary)" }}>{et.name}</p>
           {et.description_plain && (
-            <p style={{ ...S.muted, margin: "3px 0 0", fontSize: 12, maxWidth: 440 }}>{et.description_plain.slice(0, 100)}{et.description_plain.length > 100 ? "…" : ""}</p>
+            <p style={{ ...S.muted, margin: "3px 0 0", fontSize: 12, maxWidth: 440 }}>{et.description_plain.slice(0, 100)}{et.description_plain.length > 100 ? "â¦" : ""}</p>
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
@@ -340,7 +340,7 @@ function EventCard({ et, selected, onClick }) {
   );
 }
 
-// ── SlotPicker ────────────────────────────────────────────────────────────────
+// ââ SlotPicker ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function SlotPicker({ slots, selected, onSelect, conflict }) {
   const grouped = slots.reduce((acc, s) => {
     const d = new Date(s.start_time).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -377,7 +377,7 @@ function SlotPicker({ slots, selected, onSelect, conflict }) {
         <div style={S.alert}>
           <Icon.warn />
           <div>
-            <strong>Scheduling conflict detected</strong> — {fmtDate(selected.start_time)} overlaps with an existing event.
+            <strong>Scheduling conflict detected</strong> â {fmtDate(selected.start_time)} overlaps with an existing event.
             You can still book this slot or choose another time.
           </div>
         </div>
@@ -386,7 +386,7 @@ function SlotPicker({ slots, selected, onSelect, conflict }) {
   );
 }
 
-// ── LinkModal ─────────────────────────────────────────────────────────────────
+// ââ LinkModal âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose }) {
   const [singleUseLink, setSingleUseLink] = useState(null);
   const [loadingLink, setLoadingLink] = useState(false);
@@ -443,7 +443,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
       <div style={{ ...S.card, maxWidth: 560, width: "100%", margin: 0 }}>
         <div style={{ ...S.flexBetween, marginBottom: "1.25rem" }}>
           <p style={{ margin: 0, fontWeight: 500 }}>Share scheduling link</p>
-          <button onClick={onClose} style={{ ...S.btn, ...S.btnSmall, padding: "4px 8px" }}>✕</button>
+          <button onClick={onClose} style={{ ...S.btn, ...S.btnSmall, padding: "4px 8px" }}>â</button>
         </div>
 
         {/* Prefilled URL */}
@@ -465,7 +465,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
         <div>
           <span style={S.label}>Single-use link <span style={{ ...S.tag, ...S.tagInfo, marginLeft: 6 }}>1 booking max</span></span>
           <p style={{ ...S.muted, marginBottom: 8 }}>Expires after one booking. Prevents double-booking.</p>
-          {loadingLink && <p style={S.muted}>Generating link…</p>}
+          {loadingLink && <p style={S.muted}>Generating linkâ¦</p>}
           {linkError && <p style={{ color: "var(--color-text-danger)", fontSize: 13 }}>Error: {linkError}</p>}
           {singleUseLink && (
             <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
@@ -488,7 +488,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
                 <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{a}</span>
               </div>
             ))}
-            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Note: Calendly inline scheduling links don't support prefilling custom answers — share these answers with your client separately or paste them into the meeting notes.</p>
+            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Note: Calendly inline scheduling links don't support prefilling custom answers â share these answers with your client separately or paste them into the meeting notes.</p>
           </>
         )}
       </div>
@@ -496,7 +496,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
   );
 }
 
-// ── Main App ──────────────────────────────────────────────────────────────────
+// ââ Main App ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 export default function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem("cal_token") || null);
   const [user, setUser] = useState(null);
@@ -517,7 +517,7 @@ export default function App() {
   useEffect(() => {
     const params = parseCallback();
     if (params.code) {
-      const savedState = sessionStorage.getItem("oauth_state");
+      const savedState = localStorage.getItem("oauth_state");
       if (params.state !== savedState) {
         setError("OAuth state mismatch. Please try again.");
         window.history.replaceState(null, "", window.location.pathname);
@@ -611,7 +611,7 @@ export default function App() {
           owner_type: "users",
         },
       });
-      // Note: Calendly's v2 API doesn't allow direct booking on behalf of invitees via API —
+      // Note: Calendly's v2 API doesn't allow direct booking on behalf of invitees via API â
       // we generate a single-use link pre-configured to the slot and open it for confirmation.
       // For orgs with admin API access, use POST /one_off_event_types instead.
       setBooked({
@@ -639,7 +639,7 @@ export default function App() {
           <Icon.calendly />
           <div>
             <p style={S.title}>Team Booking</p>
-            {user && <p style={S.subtitle}>{user.name} · {user.email}</p>}
+            {user && <p style={S.subtitle}>{user.name} Â· {user.email}</p>}
           </div>
         </div>
         <button onClick={logout} style={{ ...S.btn, ...S.btnSmall }}>
@@ -648,7 +648,7 @@ export default function App() {
       </div>
 
       {loading && step === 0 && !eventTypes.length && (
-        <p style={S.muted}>Loading your event types…</p>
+        <p style={S.muted}>Loading your event typesâ¦</p>
       )}
 
       {error && (
@@ -660,7 +660,7 @@ export default function App() {
       {/* Confirmation / Done */}
       {step === 4 && booked && (
         <div style={S.success}>
-          <div style={{ fontSize: 40, marginBottom: "0.75rem" }}>🎉</div>
+          <div style={{ fontSize: 40, marginBottom: "0.75rem" }}>ð</div>
           <p style={{ fontWeight: 500, fontSize: 16, margin: "0 0 0.5rem" }}>Booking link generated</p>
           <p style={{ ...S.muted, marginBottom: "1.5rem", maxWidth: 380, lineHeight: 1.6 }}>
             A single-use link has been created for {fmtDate(booked.slot.start_time)}. Share it with your client or open it to confirm the booking.
@@ -682,7 +682,7 @@ export default function App() {
         <>
           <StepBar current={step} steps={STEPS} />
 
-          {/* Step 0 — Event type */}
+          {/* Step 0 â Event type */}
           {step === 0 && (
             <div style={S.section}>
               <span style={S.label}>Choose event type</span>
@@ -709,7 +709,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Step 1 — Client info */}
+          {/* Step 1 â Client info */}
           {step === 1 && (
             <div style={S.section}>
               <span style={S.label}>Client details</span>
@@ -750,7 +750,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Step 2 — Questions */}
+          {/* Step 2 â Questions */}
           {step === 2 && (
             <div style={S.section}>
               <span style={S.label}>Event questions</span>
@@ -784,7 +784,7 @@ export default function App() {
                       value={answers[q.name] || ""}
                       onChange={e => setAnswers(a => ({ ...a, [q.name]: e.target.value }))}
                     >
-                      <option value="">Select…</option>
+                      <option value="">Selectâ¦</option>
                       {(q.answer_choices || []).map(c => (
                         <option key={c} value={c}>{c}</option>
                       ))}
@@ -810,11 +810,11 @@ export default function App() {
             </div>
           )}
 
-          {/* Step 3 — Slot selection */}
+          {/* Step 3 â Slot selection */}
           {step === 3 && (
             <div style={S.section}>
-              <span style={S.label}>Pick a time — next 14 days</span>
-              {loading && <p style={S.muted}>Loading available slots…</p>}
+              <span style={S.label}>Pick a time â next 14 days</span>
+              {loading && <p style={S.muted}>Loading available slotsâ¦</p>}
               {!loading && slots.length === 0 && (
                 <p style={S.muted}>No available slots in the next 14 days.</p>
               )}
@@ -847,7 +847,7 @@ export default function App() {
                   onClick={bookEvent}
                   style={{ ...S.btn, ...S.btnPrimary, opacity: selectedSlot ? 1 : 0.4 }}
                 >
-                  {loading ? "Booking…" : "Book event"} <Icon.arrow />
+                  {loading ? "Bookingâ¦" : "Book event"} <Icon.arrow />
                 </button>
                 <button
                   onClick={() => setShowLinkModal(true)}
