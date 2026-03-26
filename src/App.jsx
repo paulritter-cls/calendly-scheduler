@@ -6,7 +6,7 @@ const CALENDLY_API = "https://api.calendly.com";
 const CLIENT_ID = import.meta.env.VITE_CALENDLY_CLIENT_ID;
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 
-// ââ helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ helpers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function base64url(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -37,16 +37,10 @@ async function buildAuthUrl() {
 
 async function exchangeCodeForToken(code) {
   const verifier = localStorage.getItem("pkce_verifier");
-  const res = await fetch(CALENDLY_TOKEN_URL, {
+  const res = await fetch("/api/token", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: CLIENT_ID,
-      code,
-      redirect_uri: REDIRECT_URI,
-      code_verifier: verifier,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, code_verifier: verifier, redirect_uri: REDIRECT_URI }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -84,7 +78,7 @@ function fmtDate(iso) {
   });
 }
 
-// ââ icons (inline SVG) ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ icons (inline SVG) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 const Icon = {
   calendly: () => (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -143,7 +137,7 @@ const Icon = {
   ),
 };
 
-// ââ styles ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ styles Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 const S = {
   page: {
     minHeight: "100vh",
@@ -259,7 +253,7 @@ const S = {
   },
 };
 
-// ââ StepBar ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ StepBar Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function StepBar({ current, steps }) {
   return (
     <div style={S.steps}>
@@ -288,12 +282,12 @@ function StepBar({ current, steps }) {
   );
 }
 
-// ââ Login âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Login Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function LoginScreen() {
   return (
     <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
       <div style={{ textAlign: "center", maxWidth: 360 }}>
-        <div style={{ fontSize: 36, marginBottom: "0.5rem" }}>ð</div>
+        <div style={{ fontSize: 36, marginBottom: "0.5rem" }}>Ã°ÂÂÂ</div>
         <h1 style={{ fontSize: 22, fontWeight: 500, margin: "0 0 0.5rem" }}>Team Booking</h1>
         <p style={{ ...S.muted, marginBottom: "2rem", lineHeight: 1.6 }}>
           Connect with Calendly to book client meetings or generate shareable scheduling links.
@@ -309,7 +303,7 @@ function LoginScreen() {
   );
 }
 
-// ââ EventCard âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ EventCard Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function EventCard({ et, selected, onClick }) {
   return (
     <div
@@ -326,7 +320,7 @@ function EventCard({ et, selected, onClick }) {
         <div>
           <p style={{ margin: 0, fontWeight: 500, fontSize: 14, color: "var(--color-text-primary)" }}>{et.name}</p>
           {et.description_plain && (
-            <p style={{ ...S.muted, margin: "3px 0 0", fontSize: 12, maxWidth: 440 }}>{et.description_plain.slice(0, 100)}{et.description_plain.length > 100 ? "â¦" : ""}</p>
+            <p style={{ ...S.muted, margin: "3px 0 0", fontSize: 12, maxWidth: 440 }}>{et.description_plain.slice(0, 100)}{et.description_plain.length > 100 ? "Ã¢ÂÂ¦" : ""}</p>
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
@@ -340,7 +334,7 @@ function EventCard({ et, selected, onClick }) {
   );
 }
 
-// ââ SlotPicker ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ SlotPicker Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function SlotPicker({ slots, selected, onSelect, conflict }) {
   const grouped = slots.reduce((acc, s) => {
     const d = new Date(s.start_time).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -377,7 +371,7 @@ function SlotPicker({ slots, selected, onSelect, conflict }) {
         <div style={S.alert}>
           <Icon.warn />
           <div>
-            <strong>Scheduling conflict detected</strong> â {fmtDate(selected.start_time)} overlaps with an existing event.
+            <strong>Scheduling conflict detected</strong> Ã¢ÂÂ {fmtDate(selected.start_time)} overlaps with an existing event.
             You can still book this slot or choose another time.
           </div>
         </div>
@@ -386,7 +380,7 @@ function SlotPicker({ slots, selected, onSelect, conflict }) {
   );
 }
 
-// ââ LinkModal âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ LinkModal Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose }) {
   const [singleUseLink, setSingleUseLink] = useState(null);
   const [loadingLink, setLoadingLink] = useState(false);
@@ -443,7 +437,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
       <div style={{ ...S.card, maxWidth: 560, width: "100%", margin: 0 }}>
         <div style={{ ...S.flexBetween, marginBottom: "1.25rem" }}>
           <p style={{ margin: 0, fontWeight: 500 }}>Share scheduling link</p>
-          <button onClick={onClose} style={{ ...S.btn, ...S.btnSmall, padding: "4px 8px" }}>â</button>
+          <button onClick={onClose} style={{ ...S.btn, ...S.btnSmall, padding: "4px 8px" }}>Ã¢ÂÂ</button>
         </div>
 
         {/* Prefilled URL */}
@@ -465,7 +459,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
         <div>
           <span style={S.label}>Single-use link <span style={{ ...S.tag, ...S.tagInfo, marginLeft: 6 }}>1 booking max</span></span>
           <p style={{ ...S.muted, marginBottom: 8 }}>Expires after one booking. Prevents double-booking.</p>
-          {loadingLink && <p style={S.muted}>Generating linkâ¦</p>}
+          {loadingLink && <p style={S.muted}>Generating linkÃ¢ÂÂ¦</p>}
           {linkError && <p style={{ color: "var(--color-text-danger)", fontSize: 13 }}>Error: {linkError}</p>}
           {singleUseLink && (
             <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
@@ -488,7 +482,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
                 <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{a}</span>
               </div>
             ))}
-            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Note: Calendly inline scheduling links don't support prefilling custom answers â share these answers with your client separately or paste them into the meeting notes.</p>
+            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Note: Calendly inline scheduling links don't support prefilling custom answers Ã¢ÂÂ share these answers with your client separately or paste them into the meeting notes.</p>
           </>
         )}
       </div>
@@ -496,7 +490,7 @@ function LinkModal({ eventType, answers, inviteeData, token, userUri, onClose })
   );
 }
 
-// ââ Main App ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Main App Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 export default function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem("cal_token") || null);
   const [user, setUser] = useState(null);
@@ -611,7 +605,7 @@ export default function App() {
           owner_type: "users",
         },
       });
-      // Note: Calendly's v2 API doesn't allow direct booking on behalf of invitees via API â
+      // Note: Calendly's v2 API doesn't allow direct booking on behalf of invitees via API Ã¢ÂÂ
       // we generate a single-use link pre-configured to the slot and open it for confirmation.
       // For orgs with admin API access, use POST /one_off_event_types instead.
       setBooked({
@@ -639,7 +633,7 @@ export default function App() {
           <Icon.calendly />
           <div>
             <p style={S.title}>Team Booking</p>
-            {user && <p style={S.subtitle}>{user.name} Â· {user.email}</p>}
+            {user && <p style={S.subtitle}>{user.name} ÃÂ· {user.email}</p>}
           </div>
         </div>
         <button onClick={logout} style={{ ...S.btn, ...S.btnSmall }}>
@@ -648,7 +642,7 @@ export default function App() {
       </div>
 
       {loading && step === 0 && !eventTypes.length && (
-        <p style={S.muted}>Loading your event typesâ¦</p>
+        <p style={S.muted}>Loading your event typesÃ¢ÂÂ¦</p>
       )}
 
       {error && (
@@ -660,7 +654,7 @@ export default function App() {
       {/* Confirmation / Done */}
       {step === 4 && booked && (
         <div style={S.success}>
-          <div style={{ fontSize: 40, marginBottom: "0.75rem" }}>ð</div>
+          <div style={{ fontSize: 40, marginBottom: "0.75rem" }}>Ã°ÂÂÂ</div>
           <p style={{ fontWeight: 500, fontSize: 16, margin: "0 0 0.5rem" }}>Booking link generated</p>
           <p style={{ ...S.muted, marginBottom: "1.5rem", maxWidth: 380, lineHeight: 1.6 }}>
             A single-use link has been created for {fmtDate(booked.slot.start_time)}. Share it with your client or open it to confirm the booking.
@@ -682,7 +676,7 @@ export default function App() {
         <>
           <StepBar current={step} steps={STEPS} />
 
-          {/* Step 0 â Event type */}
+          {/* Step 0 Ã¢ÂÂ Event type */}
           {step === 0 && (
             <div style={S.section}>
               <span style={S.label}>Choose event type</span>
@@ -709,7 +703,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Step 1 â Client info */}
+          {/* Step 1 Ã¢ÂÂ Client info */}
           {step === 1 && (
             <div style={S.section}>
               <span style={S.label}>Client details</span>
@@ -750,7 +744,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Step 2 â Questions */}
+          {/* Step 2 Ã¢ÂÂ Questions */}
           {step === 2 && (
             <div style={S.section}>
               <span style={S.label}>Event questions</span>
@@ -784,7 +778,7 @@ export default function App() {
                       value={answers[q.name] || ""}
                       onChange={e => setAnswers(a => ({ ...a, [q.name]: e.target.value }))}
                     >
-                      <option value="">Selectâ¦</option>
+                      <option value="">SelectÃ¢ÂÂ¦</option>
                       {(q.answer_choices || []).map(c => (
                         <option key={c} value={c}>{c}</option>
                       ))}
@@ -810,11 +804,11 @@ export default function App() {
             </div>
           )}
 
-          {/* Step 3 â Slot selection */}
+          {/* Step 3 Ã¢ÂÂ Slot selection */}
           {step === 3 && (
             <div style={S.section}>
-              <span style={S.label}>Pick a time â next 14 days</span>
-              {loading && <p style={S.muted}>Loading available slotsâ¦</p>}
+              <span style={S.label}>Pick a time Ã¢ÂÂ next 14 days</span>
+              {loading && <p style={S.muted}>Loading available slotsÃ¢ÂÂ¦</p>}
               {!loading && slots.length === 0 && (
                 <p style={S.muted}>No available slots in the next 14 days.</p>
               )}
@@ -847,7 +841,7 @@ export default function App() {
                   onClick={bookEvent}
                   style={{ ...S.btn, ...S.btnPrimary, opacity: selectedSlot ? 1 : 0.4 }}
                 >
-                  {loading ? "Bookingâ¦" : "Book event"} <Icon.arrow />
+                  {loading ? "BookingÃ¢ÂÂ¦" : "Book event"} <Icon.arrow />
                 </button>
                 <button
                   onClick={() => setShowLinkModal(true)}
